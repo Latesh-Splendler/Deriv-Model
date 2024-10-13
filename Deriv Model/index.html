@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Synthetic Trade Prediction</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 500px;
+            margin: 0 auto;
+            background: #ae6161;
+            padding: 20px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        h2 {
+            text-align: center;
+        }
+        .input-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+        }
+        input[type="number"], input[type="submit"] {
+            width: 100%;
+            padding: 10px;
+            margin: 5px 0;
+            box-sizing: border-box;
+        }
+        #result {
+            text-align: center;
+            font-size: 18px;
+            margin-top: 20px;
+        }
+        #countdown {
+            text-align: center;
+            font-size: 22px;
+            margin-top: 15px;
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Synthetic Trade Prediction</h2>
+    <div class="input-group">
+        <label for="duration">Trade Duration (in seconds):</label>
+        <input type="number" id="duration" placeholder="Enter duration">
+    </div>
+    <div class="input-group">
+        <input type="submit" value="Predict Trade Direction" onclick="predictTrade()">
+    </div>
+    <div id="result"></div>
+    <div id="countdown"></div>
+</div>
+
+<script>
+    let countdownInterval;
+
+    // Function to start countdown timer
+    function startCountdown(duration) {
+        clearInterval(countdownInterval);  // Clear any previous countdown
+        let timeRemaining = duration;
+        
+        countdownInterval = setInterval(() => {
+            if (timeRemaining <= 0) {
+                clearInterval(countdownInterval);
+                document.getElementById("countdown").innerHTML = "Time's up!";
+            } else {
+                document.getElementById("countdown").innerHTML = `Time remaining: ${timeRemaining} seconds`;
+                timeRemaining--;
+            }
+        }, 1000);
+    }
+
+    // Main function to predict trade and send trade request to Deriv API
+    function predictTrade() {
+        // Get user input
+        const duration = document.getElementById("duration").value;
+        
+        // Simple validation
+        if (duration === '' || duration <= 0) {
+            alert("Please enter a valid duration.");
+            return;
+        }
+
+        // Start the countdown timer
+        startCountdown(duration);
+
+        // Placeholder prediction: Replace this with actual model prediction logic
+        const prediction = Math.random() > 0.5 ? 'Rise' : 'Fall'; // Random placeholder prediction
+        
+        // Display prediction
+        document.getElementById("result").innerHTML = `Prediction: <strong>${prediction}</strong>`;
+
+        // Deriv API WebSocket connection
+        const derivToken = 'IxFATG2t9yHmudC';  
+        const endpoint = 'wss://frontend.binaryws.com/websockets/v3?app_id=1089';  // WebSocket API endpoint
+        const ws = new WebSocket(endpoint);
+
+        ws.onopen = function () {
+            // 1. Authorize with Deriv using API token
+            const authRequest = { "authorize": derivToken };
+            ws.send(JSON.stringify(authRequest));
+
+            ws.onmessage = function (msg) {
+                const data = JSON.parse(msg.data);
+
+                if (data.error) {
+                    console.error("Authorization error: ", data.error.message);
+                } else if (data.authorize) {
+                    // 2. Authorized successfully. Send buy contract request
+
+                    // Set contract type based on the prediction (CALL for Rise, PUT for Fall)
+                    const contractType = prediction === 'Rise' ? "CALL" : "PUT";
+
+                    // Buy request
+                    const buyRequest = {
+                        "buy": 1,
+                        "price": 10,  // Amount in USD to invest in the trade
+                        "parameters": {
+                            "symbol": "R_100",  // Synthetic index (replace if needed)
+                            "duration": duration,
+                            "duration_unit": "s",  // Duration in seconds
+                            "contract_type": contractType,  // 'CALL' for rise, 'PUT' for fall
+                            "currency": "USD"  // Trading currency
+                        }
+                    };
+
+                    // 3. Send the buy request to WebSocket
+                    ws.send(JSON.stringify(buyRequest));
+                }
+            };
+        };
+
+        ws.onerror = function (error) {
+            console.error("WebSocket Error: ", error);
+        };
+
+        ws.onclose = function () {
+            console.log("WebSocket connection closed");
+        };
+    }
+</script>
+
+</body>
+</html>
